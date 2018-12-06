@@ -1,0 +1,98 @@
+Function Get-DomainADUser {
+    <#
+        .DESCRIPTION
+        Locate's AD user across multiple domains.
+
+        .PARAMETER UserID
+        Specifies the user to find, accepts UPN and SAM.
+
+        .EXAMPLE
+        Get-DomainADUser -UserID first.last
+
+        .EXAMPLE
+        Get-DomainADUser -UserID first.last@domain.com
+
+        .EXAMPLE
+        Get-DomainADUser -UserID S-1-6-21-1234567890-1234567890-123456789-1234
+
+        .NOTES
+        Before running this script update the domains and domain names noted by d1,d2,d3, and d4 or d1.domain.com, d2.domain.com, d3.domain.com, or d4.domain.com before running the first time. This requires .
+    #>
+
+
+    Param(
+        [Parameter(mandatory=$True)] [string]$UserID
+    )
+    # IDENTIFY LOCAL SITE 
+    import-module activedirectory
+
+    $LocalSite = (Get-ADDomainController -Discover).Site
+    $NewTargetGC = Get-ADDomainController -Discover -Service 6 -SiteName $LocalSite
+    IF (!$NewTargetGC){ 
+        $NewTargetGC = Get-ADDomainController -Discover -Service 6 -NextClosestSite 
+    }
+    
+    # SELECT LOCAL DC
+    $NewTargetGCHostName = $NewTargetGC.HostName
+    $LocalGC = “$NewTargetGCHostName” + “:3268”
+
+    #Write-Output “Identify User and Computer Objects with configured Service Principal Names `r ”
+    #Get-ADUser $UserID -Server “$LocalGC”
+
+    # QUERY Global Catelog
+    if($UserID -match "@"){
+        $GC_UserData = Get-ADUser -Server $LocalGC -filter { UserPrincipalName -eq $UserID }
+    }
+    elseif($UserID -match "s-1-"){
+        $GC_UserData = Get-ADUser -Server $LocalGC -filter { SID -eq $UserID }
+    }
+    else{
+        $GC_UserData = Get-ADUser -Server $LocalGC -filter { SamAccountName -eq $UserID }
+    }
+
+    # Shut function down if user is not found. 
+    if (!($GC_UserData)){
+            Write-Host "Exiting"
+            Write-Host "User Doesn't Exist"
+            break
+        }
+
+    # IDENTIFY User's Domain
+    $DN = $GC_UserData.DistinguishedName
+    If ($DN) {
+        $DN = $DN.Split(',')
+        If ($DN -contains "DC=d2"){
+            #Write-Host user is in d2
+            $Domain = "d1.domain.com"
+        }
+        elseIf ($DN -contains "DC=d2"){
+            #Write-Host user is in d2
+            $Domain = "d2.domain.com"
+        }
+        elseIf ($DN -contains "DC=d3"){
+            #Write-Host user is in d3
+            $Domain = "d3.domain.com"
+        }
+        elseIf ($DN -contains "DC=d4"){
+            #Write-Host user is in d4 Domain
+            $Domain = "d4.domain.com"
+        }
+        else {
+            Write-Host "user doesn't exist."
+        }
+    }
+    Else {$Domain = "user doesn't exist."}
+    
+    if($UserID -match "@"){
+        $DC_UserData = Get-ADUser -Properties * -Server $Domain -filter { UserPrincipalName -eq $UserID } | select *
+    }
+    elseif($UserID -match "s-1-"){
+        $Domain
+        #$DC_UserData = Get-ADUser -Properties * -Server $Domain -filter { SID -eq $UserID } | select *
+    }
+    else{
+        $DC_UserData = Get-ADUser -Properties * -Server $Domain -filter { SamAccountName -eq $UserID } | select *
+    }
+
+    $DC_UserData 
+}
