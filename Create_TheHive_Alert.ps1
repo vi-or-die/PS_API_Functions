@@ -46,9 +46,14 @@ param(
     $Alert_Description = $Description -replace '<[^>]+>',''
     
     $API_headers = @{Authorization = "Bearer $APIToken"}
+    # Resolve issues with string escaping
+    $SanatizedDescription = $Alert_Description -replace '“', '"'
+    $SanatizedDescription = $SanatizedDescription -replace '”', '"'
+    $SanatizedDescription = $SanatizedDescription -replace "'", "'"
+    $body.description = $SanatizedDescription
     $body = @{
         title = "$title"
-        description = "$Alert_Description"
+        description = "$SanatizedDescription"
         type ="external"
         source ="$Source"
         sourceRef ="$SourceRef"
