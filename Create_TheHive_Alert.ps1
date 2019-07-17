@@ -50,6 +50,9 @@ param(
     $SanatizedDescription = $Alert_Description -replace '“', '"'
     $SanatizedDescription = $SanatizedDescription -replace '”', '"'
     $SanatizedDescription = $SanatizedDescription -replace "'", "'"
+    $SanatizedDescription = $SanatizedDescription -replace ' ', "`t"
+    $SanatizedDescription = $SanatizedDescription -replace "$([char]0x00A0)", "` "
+    $SanatizedDescription = [regex]::Replace($SanatizedDescription, "\s+", " ")
     $body.description = $SanatizedDescription
     $body = @{
         title = "$title"
